@@ -5,6 +5,7 @@
 #include <SD.h>
 #include <SerialFlash.h>
 #include <EEPROM.h>
+#include <math.h>
 
 #include "Settings.h"
 #include "Waves.h"
@@ -31,6 +32,7 @@
 #define READ_RESTART()     (*(volatile uint32_t *)RESTART_ADDR)
 #define WRITE_RESTART(val) ((*(volatile uint32_t *)RESTART_ADDR) = (val))
 
+#define ADC_REF 3.3
 #define ADC_BITS 13
 #define ADC_MAX_VAL 8192
 #define CHANGE_TOLERANCE 64
@@ -221,13 +223,6 @@ void setup(){
         MIDI_TO_FREQ[i] = numToFreq(i);
     }
 
-#ifdef DEBUG_STARTUP
-  while( !Serial );
-
-    Serial.println("Starting");
-    // ledWrite(waveform);
-#endif // DEBUG_STARTUP
-
     // SD CARD SETTINGS FOR MODULE 
     SPI.setMOSI(7);
     SPI.setSCK(14);
@@ -235,21 +230,12 @@ void setup(){
     // Read waveform settings from EEPROM 
     waveform = EEPROM.read(1234);
 
-#ifdef DEBUG_STARTUP
-    Serial.print("Waveform from EEPROM ");
-    Serial.println(waveform);
-#endif
-
     if (waveform < 0) waveform = 0;
     ledWrite(waveform % 4);
 
     // OPEN SD CARD 
     boolean hasSD = openSDCard();
 
-#ifdef DEBUG_STARTUP
-    Serial.print("Has SD ");
-    Serial.println(hasSD);
-#endif    
     // READ SETTINGS FROM SD CARD 
     settings.init(hasSD);
 
@@ -268,28 +254,6 @@ void setup(){
     oneOverGlideTime = 1.0 / (float) glideTime;
     noteRange = settings.noteRange;
     stacked = settings.stacked;
-
-#ifdef DEBUG_STARTUP
-    Serial.print("Waveform page ");
-    Serial.println(waveformPage);
-    Serial.print("Waveform set to ");
-    Serial.println(waveform);
-
-    Serial.println("-- Settings --");
-    Serial.print("Chord Count ");
-    Serial.println(chordCount);
-    Serial.print("Waveform Pages ");
-    Serial.println(waveformPages);
-    Serial.print("Glide ");
-    Serial.println(glide);
-    Serial.print("Glide Time ");
-    Serial.println(glideTime);
-    Serial.print("Note Range ");
-    Serial.println(noteRange);
-    Serial.print("Stacked ");
-    Serial.println(stacked);
-
-#endif
 
     // Setup audio
     for(int i=0;i<SINECOUNT;i++) {
@@ -322,11 +286,6 @@ void setup(){
         flashingWave = true;
         waveformIndicatorTimer = 0;
     }
-    
-    // This makes the CV input range for the low note half the size of the other notes.
-    rootClampLow = ((float)ADC_MAX_VAL / noteRange) * 0.5;
-    // Now map the rest of the range linearly across the input range
-    rootMapCoeff = (float)noteRange / (ADC_MAX_VAL - rootClampLow);
 
 #ifdef DEBUG_STARTUP
     Serial.print("Root Clamp Low ");
@@ -359,13 +318,10 @@ void loop(){
     checkInterface();
 
     if (changed) {
-
-        // Serial.println("Changed");
         updateAmpAndFreq();
         if(glide) {
             glideTimer = 0;
             gliding = true;
-            // Serial.println("Start glide");
         }
 
         #ifdef CHECK_CPU
@@ -438,9 +394,6 @@ void updateAmpAndFreq() {
 
                 FREQ[i] = newFreq;
                 FREQ[i+halfSinecount] = newFreq * stackFreqScale;
-                // Serial.println("Stack Freq");
-                // Serial.println(FREQ[i]);
-                // Serial.println(FREQ[i+halfSinecount]);
 
                 deltaFrequency[i] = newFreq - currentFrequency[i];
                 deltaFrequency[i+halfSinecount] = (newFreq * stackFreqScale) - currentFrequency[i];
@@ -454,19 +407,9 @@ void updateAmpAndFreq() {
                 noteNumber = rootQuant + chord[i];
                 if(noteNumber < 0) noteNumber = 0;
                 if(noteNumber > 127) noteNumber = 127;
+                
                 float newFreq = MIDI_TO_FREQ[noteNumber];
-
-                // TODO : Allow option to choose between jump from current or new?
-                //deltaFrequency[i] = newFreq - FREQ[i];
                 deltaFrequency[i] = newFreq - currentFrequency[i];
-
-                // Serial.print("Delta ");
-                // Serial.print(i);
-                // Serial.print(" ");
-                // Serial.print(deltaFrequency[i]);
-                // Serial.print(" ");
-                // Serial.println(newFreq);
-
                 FREQ[i] = newFreq;
                 voiceCount++;
             }
@@ -568,10 +511,6 @@ void updateFrequencies() {
             dt = 0.0;
             gliding = false;
         }
-        // Serial.print("dt ");
-        // Serial.print(dt);
-        // Serial.print(" ");
-        // Serial.println(glideTimer);
 
         for(int i=0;i<SINECOUNT;i++) {
             currentFrequency[i] = FREQ[i] - (deltaFrequency[i] * dt);
@@ -640,6 +579,7 @@ void checkInterface(){
         rootPotOld += (rootPot - rootPotOld) >>5;
         rootPot = rootPotOld;
     }
+    
     if ((rootCV > rootCVOld + CHANGE_TOLERANCE) || (rootCV < rootCVOld - CHANGE_TOLERANCE)){
         rootCVOld = rootCV;
         rootChanged = true;
@@ -656,10 +596,8 @@ void checkInterface(){
     }
 
     // Map ADC reading to Note Numbers
-    int rootCVQuant = LOW_NOTE;
-    if(rootCV > rootClampLow) {
-      rootCVQuant = ((rootCV - rootClampLow) * rootMapCoeff) + LOW_NOTE + 1;
-    }
+    int rootCVQuant = ceil(rootCV * ((12 * ADC_REF) / ADC_MAX_VAL)) + LOW_NOTE;
+    
     // Use Pot as transpose for CV
     int rootPotQuant = map(rootPot,0,ADC_MAX_VAL,0,48);
     rootQuant = rootCVQuant + rootPotQuant;
@@ -667,15 +605,6 @@ void checkInterface(){
         changed = true; 
         rootQuantOld = rootQuant;  
     }
-
-#ifdef DEBUG_MODE
-   if(rootChanged) {
-        // printRootInfo(rootPot,rootCV);
-   }
-#endif
-
-    //    resetSwitch.update();
-    //    resetButton = resetSwitch.read();
 
     int buttonState = digitalRead(RESET_BUTTON);
     if (buttonTimer > SHORT_PRESS_DURATION && buttonState == 0 && lockOut > 999 ){
@@ -703,33 +632,6 @@ void reBoot(int delayTime){
     if (delayTime > 0)
         delay (delayTime);
     WRITE_RESTART(0x5FA0004);
-}
-
-void printRootInfo(int rootPot, int rootCV) {
-    Serial.print("Root ");
-    Serial.print(rootPot);
-    Serial.print(" ");
-    Serial.print(rootCV);
-    Serial.print(" ");
-    Serial.println(rootQuant);
-}
-
-void printPlaying(){
-    Serial.print("Chord: ");
-    Serial.print(chordQuant);
-    Serial.print(" Root: ");
-    Serial.print(rootQuant);
-    Serial.print(" ");
-    for(int i = 0; i<SINECOUNT; i++){
-        Serial.print(i);
-        Serial.print(": ");
-        Serial.print (FREQ[i]);
-        Serial.print(" ");
-        Serial.print(AMP[i]);
-        Serial.print (" | ");
-    }
-    Serial.println("--");
-
 }
 
 float numToFreq(int input) {
