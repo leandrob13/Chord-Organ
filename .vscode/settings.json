@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "sd.h": "c",
+        "initializer_list": "cpp"
+    }
+}

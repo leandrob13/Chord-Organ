@@ -1,0 +1,30 @@
+{
+    "configurations": [
+        {
+            "name": "Teensy3",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "/Applications/Teensyduino.app/Contents/Java/hardware/teensy/avr/cores/teensy3/**",
+                "/Applications/Teensyduino.app/Contents/Java/hardware/teensy/avr/libraries/**"
+            ],
+            "defines": [
+                "__ARM_ARCH_7EM__",
+                "__MK20DX256__"
+            ],
+            "macFrameworkPath": [
+                "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks"
+            ],
+            "compilerPath": "/Applications/Teensyduino.app/Contents/Java/hardware/tools/arm/bin/arm-none-eabi-gcc",
+            "cStandard": "c11",
+            "cppStandard": "c++11",
+            "intelliSenseMode": "macos-gcc-arm",
+            "configurationProvider": "ms-vscode.makefile-tools",
+            "browse": {
+                "path": []
+            },
+            "forcedInclude": [],
+            "compilerArgs": []
+        }
+    ],
+    "version": 4
+}
