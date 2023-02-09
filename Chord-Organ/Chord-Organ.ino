@@ -10,6 +10,7 @@
 #include "Settings.h"
 #include "Waves.h"
 #include "teensy.h"
+#include "midi_lookup.h"
 
 // #define DEBUG_STARTUP
 // #define DEBUG_MODE
@@ -46,10 +47,6 @@ float AMP[SINECOUNT] = {
 float AMP_PER_VOICE[SINECOUNT] = {
   0.4,0.3,0.22,0.2,0.15,0.15,0.13,0.12};
 
-// Store midi note number to frequency in a table
-// Later can replace the table for custom tunings / scala support.
-float MIDI_TO_FREQ[128];
-
 int chordRaw;
 int chordRawOld;
 int chordQuant;
@@ -60,11 +57,6 @@ int rootCVOld;
 
 int rootQuant;
 int rootQuantOld;
-
-float rootMapCoeff;
-
-// Root CV Pin readings below this level are clamped to LOW_NOTE
-int rootClampLow;
 
 // Flag for either chord or root note change
 boolean changed = true;
@@ -196,10 +188,6 @@ void setup(){
     oscillator[5] = &waveform6;
     oscillator[6] = &waveform7;
     oscillator[7] = &waveform8;
-
-    for(int i=0;i<128;i++) {
-        MIDI_TO_FREQ[i] = numToFreq(i);
-    }
 
     // SD CARD SETTINGS FOR MODULE 
     SPI.setMOSI(7);
@@ -360,7 +348,7 @@ void updateAmpAndFreq() {
                 noteNumber = rootQuant + chord[i];
                 if(noteNumber < 0) noteNumber = 0;
                 if(noteNumber > 127) noteNumber = 127;
-                float newFreq = MIDI_TO_FREQ[noteNumber];
+                float newFreq = midi_to_freq[noteNumber];
 
                 FREQ[i] = newFreq;
                 FREQ[i+halfSinecount] = newFreq * stackFreqScale;
@@ -378,7 +366,7 @@ void updateAmpAndFreq() {
                 if(noteNumber < 0) noteNumber = 0;
                 if(noteNumber > 127) noteNumber = 127;
                 
-                float newFreq = MIDI_TO_FREQ[noteNumber];
+                float newFreq = midi_to_freq[noteNumber];
                 deltaFrequency[i] = newFreq - currentFrequency[i];
                 FREQ[i] = newFreq;
                 voiceCount++;
@@ -602,10 +590,4 @@ void reBoot(int delayTime){
     if (delayTime > 0)
         delay (delayTime);
     WRITE_RESTART(0x5FA0004);
-}
-
-float numToFreq(int input) {
-    int number = input - 21; // set to midi note numbers = start with 21 at A0 
-    number = number - 48; // A0 is 48 steps below A4 = 440hz
-    return 440*(pow (1.059463094359,number));
 }
