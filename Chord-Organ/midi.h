@@ -1,3 +1,8 @@
+#include "teensy.h"
+
+#define LOW_NOTE 36
+
+float midi_note_factor = (12 * ADC_REF) / ADC_MAX_VAL;
 
 float midi_to_freq[128] = {
     8.175798915643707,

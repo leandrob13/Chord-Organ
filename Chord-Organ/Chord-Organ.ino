@@ -10,14 +10,12 @@
 #include "Settings.h"
 #include "Waves.h"
 #include "teensy.h"
-#include "midi_lookup.h"
+#include "midi.h"
+#include "organ.h"
 
 // #define DEBUG_STARTUP
 // #define DEBUG_MODE
 // #define CHECK_CPU
-
-#define SINECOUNT 8
-#define LOW_NOTE 36
 
 // For arbitrary waveform, required but unused apparently.
 #define MAX_FREQ 600
@@ -25,67 +23,9 @@
 #define SHORT_PRESS_DURATION 10
 #define LONG_PRESS_DURATION 1000
 
-int chordCount = 16;
+Organ organ;
+Control control;
 
-// Target frequency of each oscillator
-float FREQ[SINECOUNT] = {
-    55,110, 220, 440, 880,1760,3520,7040};
-
-// Total distance between last note and new.
-// NOT distance per time step.
-float deltaFrequency[SINECOUNT] = {
-    0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};
-
-// Keep track of current frequency of each oscillator
-float currentFrequency[SINECOUNT]  = {
-    55,110, 220, 440, 880,1760,3520,7040};
-
-float AMP[SINECOUNT] = { 
-    0.9, 0.9, 0.9, 0.9,0.9, 0.9, 0.9, 0.9};
-
-// Volume for a single voice for each chord size
-float AMP_PER_VOICE[SINECOUNT] = {
-  0.4,0.3,0.22,0.2,0.15,0.15,0.13,0.12};
-
-int chordRaw;
-int chordRawOld;
-int chordQuant;
-int chordQuantOld;
-
-int rootPotOld;
-int rootCVOld;
-
-int rootQuant;
-int rootQuantOld;
-
-// Flag for either chord or root note change
-boolean changed = true;
-boolean rootChanged = false;
-
-Bounce resetCV = Bounce( RESET_CV, 40 ); 
-boolean resetButton = false;
-boolean resetCVRose;
-
-elapsedMillis resetHold;
-elapsedMillis resetFlash; 
-int updateCount = 0;
-
-elapsedMillis buttonTimer = 0;
-elapsedMillis lockOut = 0;
-boolean shortPress = false;
-boolean longPress = false;
-elapsedMillis pulseOutTimer = 0;
-uint32_t flashTime = 10;
-boolean flashing = false;
-
-// WAVEFORM
-// Default wave types
-short wave_type[4] = {
-    WAVEFORM_SINE,
-    WAVEFORM_SQUARE,
-    WAVEFORM_SAWTOOTH,
-    WAVEFORM_PULSE,
-};
 // Current waveform index
 int waveform = 0; 
 
@@ -102,20 +42,12 @@ int16_t const* waveTables[8] {
     wave7,
     wave3,
     wave4,    
-
     wave8,
     wave9,
     wave10,
     wave11
 };
 
-// Per-waveform amp level
-// First 4 are default waves, last 8 are custom wavetables
-float WAVEFORM_AMP[12] = {
-  0.8,0.6,0.8,0.6,
-  0.8,0.8,0.8,0.8,
-  0.8,0.8,0.8,0.8,
-};
 
 // GLIDE
 // Main flag for glide on / off
@@ -205,7 +137,7 @@ void setup(){
     // READ SETTINGS FROM SD CARD 
     settings.init(hasSD);
 
-    chordCount = settings.numChords;
+    organ.chordCount = settings.numChords;
     waveformPages = settings.extraWaves ? 3 : 1;
     if(waveformPages > 1) {
         waveformPage = waveform >> 2;
@@ -244,7 +176,7 @@ void setup(){
 
     if(waveformPage == 0) {
         // First page is built in waveforms
-        setWaveformType(wave_type[waveform]);
+        setWaveformType(organ.wave_type[waveform]);
     } else {
         // Second and third pages are arbitrary waves
         setupCustomWaveform(waveform);
@@ -275,7 +207,7 @@ void loop(){
 
     checkInterface();
 
-    if (changed) {
+    if (control.changed) {
         updateAmpAndFreq();
         if(glide) {
             glideTimer = 0;
@@ -290,30 +222,30 @@ void loop(){
     }
 
     // CHECK BUTTON STATUS 
-    resetHold = resetHold * resetButton;
+    control.resetHold = control.resetHold * control.resetButton;
 
-    if (shortPress){
+    if (control.shortPress){
         waveform++;
         waveform = waveform % (4 * waveformPages);
         selectWaveform(waveform);
-        changed = true;
-        shortPress = false;
+        control.changed = true;
+        control.shortPress = false;
     }
 
-    if (changed)  {
+    if (control.changed)  {
         // Serial.println("Trig Out");
-        pulseOutTimer = 0;
-        flashing = true;
+        control.pulseOutTimer = 0;
+        control.flashing = true;
         pinMode(RESET_CV, OUTPUT);
         digitalWrite (RESET_LED, HIGH);
         digitalWrite (RESET_CV, HIGH);
 
         AudioNoInterrupts();
         updateFrequencies();
-        updateAmps();
+        updateAmps(organ.AMP, organ.WAVEFORM_AMP);
         AudioInterrupts();
 
-        changed = false;
+        control.changed = false;
     }
 
     if(gliding) {
@@ -327,16 +259,16 @@ void loop(){
 
     updateWaveformLEDs();
 
-    if (flashing && (pulseOutTimer > flashTime)) {
+    if (control.flashing && (control.pulseOutTimer > control.flashTime)) {
         digitalWrite (RESET_LED, LOW);
         digitalWrite (RESET_CV, LOW);
         pinMode(RESET_CV, INPUT);
-        flashing = false;  
+        control.flashing = false;  
     } 
 }
 
 void updateAmpAndFreq() {
-    int16_t* chord = settings.notes[chordQuant];
+    int16_t* chord = settings.notes[control.chordQuant];
 
     int noteNumber;
     int voiceCount = 0;
@@ -345,16 +277,16 @@ void updateAmpAndFreq() {
     if(stacked) {
         for(int i=0;i < halfSinecount;i++) {
             if (chord[i] != 255) {
-                noteNumber = rootQuant + chord[i];
+                noteNumber = control.rootQuant + chord[i];
                 if(noteNumber < 0) noteNumber = 0;
                 if(noteNumber > 127) noteNumber = 127;
                 float newFreq = midi_to_freq[noteNumber];
 
-                FREQ[i] = newFreq;
-                FREQ[i+halfSinecount] = newFreq * stackFreqScale;
+                organ.FREQ[i] = newFreq;
+                organ.FREQ[i+halfSinecount] = newFreq * stackFreqScale;
 
-                deltaFrequency[i] = newFreq - currentFrequency[i];
-                deltaFrequency[i+halfSinecount] = (newFreq * stackFreqScale) - currentFrequency[i];
+                organ.deltaFrequency[i] = newFreq - organ.currentFrequency[i];
+                organ.deltaFrequency[i+halfSinecount] = (newFreq * stackFreqScale) - organ.currentFrequency[i];
 
                 voiceCount += 2;
             }            
@@ -362,41 +294,41 @@ void updateAmpAndFreq() {
     } else {
         for(int i = 0; i< SINECOUNT; i++){
             if (chord[i] != 255) {
-                noteNumber = rootQuant + chord[i];
+                noteNumber = control.rootQuant + chord[i];
                 if(noteNumber < 0) noteNumber = 0;
                 if(noteNumber > 127) noteNumber = 127;
                 
                 float newFreq = midi_to_freq[noteNumber];
-                deltaFrequency[i] = newFreq - currentFrequency[i];
-                FREQ[i] = newFreq;
+                organ.deltaFrequency[i] = newFreq - organ.currentFrequency[i];
+                organ.FREQ[i] = newFreq;
                 voiceCount++;
             }
         }
 
     }
 
-    float ampPerVoice = AMP_PER_VOICE[voiceCount-1];
+    float ampPerVoice = organ.AMP_PER_VOICE[voiceCount-1];
     float totalAmp = 0;
 
     if(stacked) {
         for (int i = 0; i < halfSinecount; i++){
             if (chord[i] != 255) {
-                AMP[i] = ampPerVoice;
-                AMP[i + halfSinecount] = ampPerVoice; 
+                organ.AMP[i] = ampPerVoice;
+                organ.AMP[i + halfSinecount] = ampPerVoice; 
                 totalAmp += ampPerVoice;
             }
             else{
-                AMP[i] = 0.0;   
+                organ.AMP[i] = 0.0;   
             }
         }        
     } else {
         for (int i = 0; i< SINECOUNT; i++){
             if (chord[i] != 255) {
-                AMP[i] = ampPerVoice;
+                organ.AMP[i] = ampPerVoice;
                 totalAmp += ampPerVoice;
             }
             else{
-                AMP[i] = 0.0;   
+                organ.AMP[i] = 0.0;   
             }
         }        
     }
@@ -420,7 +352,7 @@ void selectWaveform(int waveform) {
 
     AudioNoInterrupts();
     if(waveformPage == 0) {
-        setWaveformType(wave_type[waveform]);
+        setWaveformType(organ.wave_type[waveform]);
     } else {
         setupCustomWaveform(waveform);    
     }
@@ -429,7 +361,7 @@ void selectWaveform(int waveform) {
 
 void setWaveformType(short waveformType) {
     for(int i=0;i<SINECOUNT;i++) {
-        oscillator[i]->begin(1.0,FREQ[i],waveformType);
+        oscillator[i]->begin(1.0, organ.FREQ[i], waveformType);
     }   
 }
 
@@ -471,17 +403,17 @@ void updateFrequencies() {
         }
 
         for(int i=0;i<SINECOUNT;i++) {
-            currentFrequency[i] = FREQ[i] - (deltaFrequency[i] * dt);
-            oscillator[i]->frequency(currentFrequency[i]);
+            organ.currentFrequency[i] = organ.FREQ[i] - (organ.deltaFrequency[i] * dt);
+            oscillator[i]->frequency(organ.currentFrequency[i]);
         }
     } else {
         for(int i=0;i<SINECOUNT;i++) {
-            oscillator[i]->frequency(FREQ[i]);
+            oscillator[i]->frequency(organ.FREQ[i]);
         }
     }
 }
 
-void updateAmps(){
+void updateAmps(float* AMP, float* WAVEFORM_AMP){
     float waveAmp = WAVEFORM_AMP[waveform];
     mixer1.gain(0,AMP[0] * waveAmp);
     mixer1.gain(1,AMP[1] * waveAmp);
@@ -510,78 +442,78 @@ void checkInterface(){
     int rootCV = analogRead(ROOT_CV_PIN); 
 
     // Copy pots and CVs to new value 
-    chordRaw = chordPot + chordCV; 
-    chordRaw = constrain(chordRaw, 0, ADC_MAX_VAL - 1);
+    control.chordRaw = chordPot + chordCV; 
+    control.chordRaw = constrain(control.chordRaw, 0, ADC_MAX_VAL - 1);
 
     rootPot = constrain(rootPot, 0, ADC_MAX_VAL - 1);
     rootCV = constrain(rootCV, 0, ADC_MAX_VAL - 1);
 
-    rootChanged = false;
+    control.rootChanged = false;
     // Apply hysteresis and filtering to prevent jittery quantization 
     // Thanks to Matthias Puech for this code 
 
-    if ((chordRaw > chordRawOld + CHANGE_TOLERANCE) || (chordRaw < chordRawOld - CHANGE_TOLERANCE)){
-        chordRawOld = chordRaw;    
+    if ((control.chordRaw > control.chordRawOld + CHANGE_TOLERANCE) || (control.chordRaw < control.chordRawOld - CHANGE_TOLERANCE)){
+        control.chordRawOld = control.chordRaw;    
     }
     else {
-        chordRawOld += (chordRaw - chordRawOld) >>5; 
-        chordRaw = chordRawOld;  
+        control.chordRawOld += (control.chordRaw - control.chordRawOld) >>5; 
+        control.chordRaw = control.chordRawOld;  
     }
 
     // Do Pot and CV separately
-    if ((rootPot > rootPotOld + CHANGE_TOLERANCE) || (rootPot < rootPotOld - CHANGE_TOLERANCE)){
-        rootPotOld = rootPot;
-        rootChanged = true;
+    if ((rootPot > control.rootPotOld + CHANGE_TOLERANCE) || (rootPot < control.rootPotOld - CHANGE_TOLERANCE)){
+        control.rootPotOld = rootPot;
+        control.rootChanged = true;
     }
     else {
-        rootPotOld += (rootPot - rootPotOld) >>5;
-        rootPot = rootPotOld;
+        control.rootPotOld += (rootPot - control.rootPotOld) >>5;
+        rootPot = control.rootPotOld;
     }
     
-    if ((rootCV > rootCVOld + CHANGE_TOLERANCE) || (rootCV < rootCVOld - CHANGE_TOLERANCE)){
-        rootCVOld = rootCV;
-        rootChanged = true;
+    if ((rootCV > control.rootCVOld + CHANGE_TOLERANCE) || (rootCV < control.rootCVOld - CHANGE_TOLERANCE)){
+        control.rootCVOld = rootCV;
+        control.rootChanged = true;
     }
     else {
-        rootCVOld += (rootCV - rootCVOld) >>5;
-        rootCV = rootCVOld;
+        control.rootCVOld += (rootCV - control.rootCVOld) >>5;
+        rootCV = control.rootCVOld;
     }
 
-    chordQuant = map(chordRaw, 0, ADC_MAX_VAL, 0, chordCount);
-    if (chordQuant != chordQuantOld){
-        changed = true; 
-        chordQuantOld = chordQuant;    
+    control.chordQuant = map(control.chordRaw, 0, ADC_MAX_VAL, 0, organ.chordCount);
+    if (control.chordQuant != control.chordQuantOld){
+        control.changed = true; 
+        control.chordQuantOld = control.chordQuant;    
     }
 
     // Map ADC reading to Note Numbers
-    int rootCVQuant = ceil(rootCV * ((12 * ADC_REF) / ADC_MAX_VAL)) + LOW_NOTE;
+    int rootCVQuant = ceil(rootCV * midi_note_factor) + LOW_NOTE;
     
     // Use Pot as transpose for CV
     int rootPotQuant = map(rootPot,0,ADC_MAX_VAL,0,48);
-    rootQuant = rootCVQuant + rootPotQuant;
-    if (rootQuant != rootQuantOld){
-        changed = true; 
-        rootQuantOld = rootQuant;  
+    control.rootQuant = rootCVQuant + rootPotQuant;
+    if (control.rootQuant != control.rootQuantOld){
+       control.changed = true; 
+       control.rootQuantOld = control.rootQuant;  
     }
 
     int buttonState = digitalRead(RESET_BUTTON);
-    if (buttonTimer > SHORT_PRESS_DURATION && buttonState == 0 && lockOut > 999 ){
-        shortPress = true;    
+    if (control.buttonTimer > SHORT_PRESS_DURATION && buttonState == 0 && control.lockOut > 999 ){
+        control.shortPress = true;    
     }
 
-    buttonTimer = buttonTimer * buttonState; 
-    if (buttonTimer > LONG_PRESS_DURATION){
-        longPress = true;
-        lockOut = 0;
-        buttonTimer = 0;
+    control.buttonTimer = control.buttonTimer * buttonState; 
+    if (control.buttonTimer > LONG_PRESS_DURATION){
+        control.longPress = true;
+        control.lockOut = 0;
+        control.buttonTimer = 0;
     }
 
-    if (!flashing){
-        resetCV.update();
-        resetCVRose = resetCV.rose();
-        if (resetCVRose) resetFlash = 0; 
+    if (!control.flashing){
+        control.resetCV.update();
+        control.resetCVRose = control.resetCV.rose();
+        if (control.resetCVRose) control.resetFlash = 0; 
 
-        digitalWrite(RESET_LED, (resetFlash<20));
+        digitalWrite(RESET_LED, (control.resetFlash<20));
     }
 
 }
