@@ -39,10 +39,16 @@ typedef struct Control
     uint32_t flashTime = 10;
     boolean flashing = false;
 
+    int waveformPage = 0;
+    int waveformPages = 1;
+
 } Control;
 
 typedef struct Organ {
     int chordCount = 16;
+
+    // Current waveform index
+    int waveform = 0; 
 
     // Target frequency of each oscillator
     float FREQ[SINECOUNT] = {
@@ -79,5 +85,23 @@ typedef struct Organ {
         0.8,0.8,0.8,0.8,
         0.8,0.8,0.8,0.8,
     };
+
+    // GLIDE
+    // Main flag for glide on / off
+    boolean glide = false;
+    // msecs glide time. 
+    uint32_t glideTime = 50;
+    // keep reciprocal
+    float oneOverGlideTime = 0.02;
+    // Time since glide started
+    elapsedMillis glideTimer = 0;
+    // Are we currently gliding notes
+    boolean gliding = false;
+
+    // Stack mode replicates first 4 voices into last 4 with tuning offset
+    boolean stacked = false;
+    float stackFreqScale = 1.001;
+
+    int noteRange = 38;
 
 } Organ;

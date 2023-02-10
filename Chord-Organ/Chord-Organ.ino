@@ -23,18 +23,9 @@
 #define SHORT_PRESS_DURATION 10
 #define LONG_PRESS_DURATION 1000
 
+Settings settings("CHORDORG.TXT");
 Organ organ;
 Control control;
-
-// Current waveform index
-int waveform = 0; 
-
-// Waveform LED
-boolean flashingWave = false;
-elapsedMillis waveformIndicatorTimer = 0;
-
-int waveformPage = 0;
-int waveformPages = 1;
 
 // Custom wavetables
 int16_t const* waveTables[8] {
@@ -47,25 +38,6 @@ int16_t const* waveTables[8] {
     wave10,
     wave11
 };
-
-
-// GLIDE
-// Main flag for glide on / off
-boolean glide = false;
-// msecs glide time. 
-uint32_t glideTime = 50;
-// keep reciprocal
-float oneOverGlideTime = 0.02;
-// Time since glide started
-elapsedMillis glideTimer = 0;
-// Are we currently gliding notes
-boolean gliding = false;
-
-// Stack mode replicates first 4 voices into last 4 with tuning offset
-boolean stacked = false;
-float stackFreqScale = 1.001;
-
-int noteRange = 38;
 
 // GUItool: begin automatically generated code
 
@@ -98,8 +70,6 @@ AudioConnection          patchCord12(envelope1, dac1);
 // Pointers to waveforms
 AudioSynthWaveform* oscillator[8];
 
-Settings settings("CHORDORG.TXT");
-
 void setup(){
     pinMode(BANK_BUTTON,INPUT);
     pinMode(RESET_BUTTON, INPUT);
@@ -126,10 +96,10 @@ void setup(){
     SPI.setSCK(14);
 
     // Read waveform settings from EEPROM 
-    waveform = EEPROM.read(1234);
+    organ.waveform = EEPROM.read(1234);
 
-    if (waveform < 0) waveform = 0;
-    ledWrite(waveform % 4);
+    if (organ.waveform < 0) organ.waveform = 0;
+    ledWrite(organ.waveform);
 
     // OPEN SD CARD 
     boolean hasSD = openSDCard();
@@ -138,20 +108,20 @@ void setup(){
     settings.init(hasSD);
 
     organ.chordCount = settings.numChords;
-    waveformPages = settings.extraWaves ? 3 : 1;
-    if(waveformPages > 1) {
-        waveformPage = waveform >> 2;
+    control.waveformPages = settings.extraWaves ? 3 : 1;
+    if(control.waveformPages > 1) {
+        control.waveformPage = organ.waveform >> 2;
     } else {
         // If we read a custom waveform index from EEPROM
         // but they are not enabled in the config then change back to sine
-        waveform = 0;
+        organ.waveform = 0;
     }
     
-    glide = settings.glide;
-    glideTime = settings.glideTime;
-    oneOverGlideTime = 1.0 / (float) glideTime;
-    noteRange = settings.noteRange;
-    stacked = settings.stacked;
+    organ.glide = settings.glide;
+    organ.glideTime = settings.glideTime;
+    organ.oneOverGlideTime = 1.0 / (float) organ.glideTime;
+    organ.noteRange = settings.noteRange;
+    organ.stacked = settings.stacked;
 
     // Setup audio
     for(int i=0;i<SINECOUNT;i++) {
@@ -174,15 +144,12 @@ void setup(){
     envelope1.release(1);
     envelope1.noteOn();
 
-    if(waveformPage == 0) {
+    if(control.waveformPage == 0) {
         // First page is built in waveforms
-        setWaveformType(organ.wave_type[waveform]);
+        setWaveformType(organ.wave_type[organ.waveform]);
     } else {
         // Second and third pages are arbitrary waves
-        setupCustomWaveform(waveform);
-        // Start the wave led flashing
-        flashingWave = true;
-        waveformIndicatorTimer = 0;
+        setupCustomWaveform(organ.waveform);
     }
 }
 
@@ -209,25 +176,19 @@ void loop(){
 
     if (control.changed) {
         updateAmpAndFreq();
-        if(glide) {
-            glideTimer = 0;
-            gliding = true;
+        if(organ.glide) {
+            organ.glideTimer = 0;
+            organ.gliding = true;
         }
-
-        #ifdef CHECK_CPU
-        int maxCPU = AudioProcessorUsageMax();
-        Serial.print("MaxCPU=");
-        Serial.println(maxCPU);
-        #endif // CHECK_CPU
     }
 
     // CHECK BUTTON STATUS 
     control.resetHold = control.resetHold * control.resetButton;
 
     if (control.shortPress){
-        waveform++;
-        waveform = waveform % (4 * waveformPages);
-        selectWaveform(waveform);
+        organ.waveform++;
+        organ.waveform = organ.waveform % (4 * control.waveformPages);
+        selectWaveform(organ.waveform);
         control.changed = true;
         control.shortPress = false;
     }
@@ -248,16 +209,14 @@ void loop(){
         control.changed = false;
     }
 
-    if(gliding) {
-        if(glideTimer >= glideTime) {
-            gliding = false;
+    if(organ.gliding) {
+        if(organ.glideTimer >= organ.glideTime) {
+            organ.gliding = false;
         }
         AudioNoInterrupts();
         updateFrequencies();
         AudioInterrupts();
     }
-
-    updateWaveformLEDs();
 
     if (control.flashing && (control.pulseOutTimer > control.flashTime)) {
         digitalWrite (RESET_LED, LOW);
@@ -274,7 +233,7 @@ void updateAmpAndFreq() {
     int voiceCount = 0;
     int halfSinecount = SINECOUNT>>1;
 
-    if(stacked) {
+    if(organ.stacked) {
         for(int i=0;i < halfSinecount;i++) {
             if (chord[i] != 255) {
                 noteNumber = control.rootQuant + chord[i];
@@ -283,10 +242,10 @@ void updateAmpAndFreq() {
                 float newFreq = midi_to_freq[noteNumber];
 
                 organ.FREQ[i] = newFreq;
-                organ.FREQ[i+halfSinecount] = newFreq * stackFreqScale;
+                organ.FREQ[i+halfSinecount] = newFreq * organ.stackFreqScale;
 
                 organ.deltaFrequency[i] = newFreq - organ.currentFrequency[i];
-                organ.deltaFrequency[i+halfSinecount] = (newFreq * stackFreqScale) - organ.currentFrequency[i];
+                organ.deltaFrequency[i+halfSinecount] = (newFreq * organ.stackFreqScale) - organ.currentFrequency[i];
 
                 voiceCount += 2;
             }            
@@ -310,7 +269,7 @@ void updateAmpAndFreq() {
     float ampPerVoice = organ.AMP_PER_VOICE[voiceCount-1];
     float totalAmp = 0;
 
-    if(stacked) {
+    if(organ.stacked) {
         for (int i = 0; i < halfSinecount; i++){
             if (chord[i] != 255) {
                 organ.AMP[i] = ampPerVoice;
@@ -335,12 +294,8 @@ void updateAmpAndFreq() {
 }
 
 void selectWaveform(int waveform) {
-    waveformPage = waveform >> 2;
-    if(waveformPage > 0) {
-        flashingWave = true;
-        waveformIndicatorTimer = 0;
-    }  
-    ledWrite(waveform % 4);
+    control.waveformPage = waveform >> 2;
+    ledWrite(waveform);
     EEPROM.write(1234, waveform);
 
     #ifdef DEBUG_MODE
@@ -351,7 +306,7 @@ void selectWaveform(int waveform) {
     #endif // DEBUG_MODE
 
     AudioNoInterrupts();
-    if(waveformPage == 0) {
+    if(control.waveformPage == 0) {
         setWaveformType(organ.wave_type[waveform]);
     } else {
         setupCustomWaveform(waveform);    
@@ -376,30 +331,14 @@ void setupCustomWaveform(int waveselect) {
     setWaveformType(WAVEFORM_ARBITRARY);
 }
 
-void updateWaveformLEDs() {
-    // Flash waveform LEDs for custom waves
-    if(waveformPage > 0) {
-        uint32_t blinkTime = 100 + ((waveformPage - 1) * 300);
-        if(waveformIndicatorTimer >= blinkTime) {
-            waveformIndicatorTimer = 0;
-            flashingWave = !flashingWave;
-            if(flashingWave) {
-                ledWrite(waveform % 4);
-            } else {
-                ledWrite(15);
-            }
-        }
-    }    
-}
-
 void updateFrequencies() {
 
-    if(gliding) {
+    if(organ.gliding) {
         // TODO : Replace division with reciprocal multiply.
-        float dt = 1.0 - (glideTimer * oneOverGlideTime);
+        float dt = 1.0 - (organ.glideTimer * organ.oneOverGlideTime);
         if(dt < 0.0) {
             dt = 0.0;
-            gliding = false;
+            organ.gliding = false;
         }
 
         for(int i=0;i<SINECOUNT;i++) {
@@ -414,7 +353,7 @@ void updateFrequencies() {
 }
 
 void updateAmps(float* AMP, float* WAVEFORM_AMP){
-    float waveAmp = WAVEFORM_AMP[waveform];
+    float waveAmp = WAVEFORM_AMP[organ.waveform];
     mixer1.gain(0,AMP[0] * waveAmp);
     mixer1.gain(1,AMP[1] * waveAmp);
     mixer1.gain(2,AMP[2] * waveAmp);
@@ -427,10 +366,10 @@ void updateAmps(float* AMP, float* WAVEFORM_AMP){
 
 // WRITE A 4 DIGIT BINARY NUMBER TO LED0-LED3 
 void ledWrite(int n){
-    digitalWrite(LED3, HIGH && (n==0));
-    digitalWrite(LED2, HIGH && (n==1));
-    digitalWrite(LED1, HIGH && (n==2));
-    digitalWrite(LED0, HIGH && (n==3)); 
+    digitalWrite(LED3, (n >> 3) & 1);
+    digitalWrite(LED2, (n >> 2) & 1);
+    digitalWrite(LED1, (n >> 1) & 1);
+    digitalWrite(LED0, (n >> 0) & 1); 
 }
 
 void checkInterface(){
@@ -516,10 +455,4 @@ void checkInterface(){
         digitalWrite(RESET_LED, (control.resetFlash<20));
     }
 
-}
-
-void reBoot(int delayTime){
-    if (delayTime > 0)
-        delay (delayTime);
-    WRITE_RESTART(0x5FA0004);
 }
