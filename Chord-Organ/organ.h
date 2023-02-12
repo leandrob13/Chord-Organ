@@ -3,96 +3,61 @@
 #include <synth_waveform.h>
 
 #include "teensy.h"
+#include "midi.h"
+#include "Settings.h"
 
-#define SINECOUNT 8
+//#define SINECOUNT 8
 
 typedef struct Control
 {
-    int chordRaw;
     int chordRawOld;
-    int chordQuant;
-    int chordQuantOld;
-
     int rootPotOld;
     int rootCVOld;
 
-    int rootQuant;
-    int rootQuantOld;
-
     // Flag for either chord or root note change
     boolean changed = true;
-    boolean rootChanged = false;
+    boolean root_changed = false;
 
-    Bounce resetCV = Bounce( RESET_CV, 40 ); 
+    Bounce reset_cv = Bounce( RESET_CV, 40 ); 
     boolean resetButton = false;
-    boolean resetCVRose;
-
-    elapsedMillis resetHold;
-    elapsedMillis resetFlash; 
-    int updateCount = 0;
-
-    elapsedMillis buttonTimer = 0;
-    elapsedMillis lockOut = 0;
-    boolean shortPress = false;
-    boolean longPress = false;
-    elapsedMillis pulseOutTimer = 0;
-    uint32_t flashTime = 10;
+    boolean reset_cv_rose;
+    elapsedMillis reset_hold;
+    elapsedMillis reset_flash; 
+    elapsedMillis button_timer = 0;
+    elapsedMillis lock_out = 0;
+    boolean short_press = false;
+    boolean long_press = false;
+    elapsedMillis pulse_out_timer = 0;
+    uint32_t flash_time = 10;
     boolean flashing = false;
-
-    int waveformPage = 0;
-    int waveformPages = 1;
 
 } Control;
 
 typedef struct Organ {
-    int chordCount = 16;
-
-    // Current waveform index
-    int waveform = 0; 
+    static const int oscillator_count = 8;
+    int chord_count = 16;
+    int chord;
+    int chord_old;
+    int root;
+    int root_old;
 
     // Target frequency of each oscillator
-    float FREQ[SINECOUNT] = {
-        55,110, 220, 440, 880,1760,3520,7040};
+    float freq[oscillator_count] = {55,110, 220, 440, 880,1760,3520,7040};
 
     // Total distance between last note and new.
     // NOT distance per time step.
-    float deltaFrequency[SINECOUNT] = {
-        0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};
+    float delta_frequency[oscillator_count] = {0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};
 
     // Keep track of current frequency of each oscillator
-    float currentFrequency[SINECOUNT]  = {
-        55,110, 220, 440, 880,1760,3520,7040};
-
-    float AMP[SINECOUNT] = { 
-        0.9, 0.9, 0.9, 0.9,0.9, 0.9, 0.9, 0.9};
-
-    // Volume for a single voice for each chord size
-    float AMP_PER_VOICE[SINECOUNT] = {
-    0.4,0.3,0.22,0.2,0.15,0.15,0.13,0.12};
-
-    // Default wave types
-    short wave_type[4] = {
-        WAVEFORM_SINE,
-        WAVEFORM_SQUARE,
-        WAVEFORM_SAWTOOTH,
-        WAVEFORM_PULSE,
-    };
-
-    // Per-waveform amp level
-    // First 4 are default waves, last 8 are custom wavetables
-    float WAVEFORM_AMP[12] = {
-        0.8,0.6,0.8,0.6,
-        0.8,0.8,0.8,0.8,
-        0.8,0.8,0.8,0.8,
-    };
+    float current_frequency[oscillator_count] = {55,110, 220, 440, 880,1760,3520,7040};
 
     // GLIDE
     // Main flag for glide on / off
     boolean glide = false;
     // msecs glide time. 
-    uint32_t glideTime = 50;
+    uint32_t glide_time = 50;
     // keep reciprocal
-    float oneOverGlideTime = 0.02;
+    float one_over_glide_time = 0.02;
     // Time since glide started
     elapsedMillis glideTimer = 0;
     // Are we currently gliding notes
@@ -100,8 +65,78 @@ typedef struct Organ {
 
     // Stack mode replicates first 4 voices into last 4 with tuning offset
     boolean stacked = false;
-    float stackFreqScale = 1.001;
+    float stack_freq_scale = 1.001;
 
-    int noteRange = 38;
+    int note_range = 38;
+
+    void init(Settings settings) {
+        chord_count = settings.num_chords;
+        glide = settings.glide;
+        glide_time = settings.glide_time;
+        one_over_glide_time = 1.0 / (float) glide_time;
+        note_range = settings.note_range;
+        stacked = settings.stacked;
+    }
+
+    float* get_current_frequency() {
+        float* result_frequency = freq;
+        if(gliding) {
+            float dt = 1.0 - (glideTimer * one_over_glide_time);
+            if(dt < 0.0) {
+                dt = 0.0;
+                gliding = false;
+            }
+
+            for(int i=0;i<8;i++) {
+                current_frequency[i] = freq[i] - (delta_frequency[i] * dt);
+                //result_frequency[i] = //oscillator[i]->frequency(organ.currentFrequency[i]);
+            }
+            result_frequency = current_frequency;
+        } /*else {
+            //for(int i=0;i<8;i++) {
+            //    result_frequency[i] = FREQ[i];
+            //}
+            return FREQ;
+        }*/
+        return result_frequency;
+    }
+
+    int update_frequencies(int16_t* chord) {
+        int note_number;
+        int voice_count = 0;
+        int half_oscillator_count = oscillator_count >> 1;
+
+        if(stacked) {
+            for(int i=0;i < half_oscillator_count;i++) {
+                if (chord[i] != 255) {
+                    note_number = root + chord[i];
+                    if(note_number < 0) note_number = 0;
+                    if(note_number > 127) note_number = 127;
+                    float new_freq = midi_to_freq_lut[note_number];
+
+                    freq[i] = new_freq;
+                    freq[i+half_oscillator_count] = new_freq * stack_freq_scale;
+                    delta_frequency[i] = new_freq - current_frequency[i];
+                    delta_frequency[i+half_oscillator_count] = (new_freq * stack_freq_scale) - current_frequency[i];
+                    voice_count += 2;
+                }            
+            }
+        } else {
+            for(int i = 0; i< 8; i++){
+                if (chord[i] != 255) {
+                    note_number = root + chord[i];
+                    if(note_number < 0) note_number = 0;
+                    if(note_number > 127) note_number = 127;
+                    
+                    float newFreq = midi_to_freq_lut[note_number];
+                    delta_frequency[i] = newFreq - current_frequency[i];
+                    freq[i] = newFreq;
+                    voice_count++;
+                }
+            }
+
+        }
+        return voice_count;
+    }
 
 } Organ;

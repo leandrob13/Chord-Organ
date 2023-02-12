@@ -1,10 +1,10 @@
 #include "teensy.h"
 
-#define LOW_NOTE 36
+const short LOW_NOTE = 36;
 
 float midi_note_factor = (12 * ADC_REF) / ADC_MAX_VAL;
 
-float midi_to_freq[128] = {
+float midi_to_freq_lut[128] = {
     8.175798915643707,
     8.661957218027252,
     9.177023997418988,
