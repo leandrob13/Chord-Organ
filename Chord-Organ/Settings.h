@@ -13,6 +13,7 @@ class Settings {
 	boolean to_boolean(String setting_value);
 
 	boolean stacked = false;
+	boolean no_valid_value = false;
     boolean glide = false;
     int glide_time = 50;
     uint8_t note_range = 38;

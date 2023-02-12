@@ -1,4 +1,3 @@
-#include <SD.h>
 #include "Settings.h"
 
 Settings::Settings(const char* filename) {
@@ -98,9 +97,7 @@ void Settings::read() {
                 } else if(setting_value.startsWith("!STACK")) {
                 	stacked = true;
                 } else {
-                    Serial.print("Unknown option:");
-                    Serial.print(setting_value);
-                    Serial.println(":");
+                    no_valid_value = true;
                 }
                 setting_value = "";
                 state = NONE;

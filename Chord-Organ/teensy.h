@@ -11,11 +11,6 @@
 #define LED2 4
 #define LED3 3
 
-// REBOOT CODES 
-#define RESTART_ADDR       0xE000ED0C
-#define READ_RESTART()     (*(volatile uint32_t *)RESTART_ADDR)
-#define WRITE_RESTART(val) ((*(volatile uint32_t *)RESTART_ADDR) = (val))
-
 #define ADC_REF 3.3
 #define ADC_BITS 13
 #define ADC_MAX_VAL 8192

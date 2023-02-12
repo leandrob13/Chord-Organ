@@ -1,9 +1,3 @@
-#include <Bounce2.h>
-#include <Audio.h>
-#include <Wire.h>
-#include <SPI.h>
-#include <SD.h>
-#include <SerialFlash.h>
 #include <EEPROM.h>
 #include <math.h>
 

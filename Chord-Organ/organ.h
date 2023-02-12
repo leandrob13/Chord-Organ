@@ -2,11 +2,8 @@
 #include <Bounce2.h>
 #include <synth_waveform.h>
 
-#include "teensy.h"
 #include "midi.h"
 #include "Settings.h"
-
-//#define SINECOUNT 8
 
 typedef struct Control
 {
@@ -89,15 +86,9 @@ typedef struct Organ {
 
             for(int i=0;i<8;i++) {
                 current_frequency[i] = freq[i] - (delta_frequency[i] * dt);
-                //result_frequency[i] = //oscillator[i]->frequency(organ.currentFrequency[i]);
             }
             result_frequency = current_frequency;
-        } /*else {
-            //for(int i=0;i<8;i++) {
-            //    result_frequency[i] = FREQ[i];
-            //}
-            return FREQ;
-        }*/
+        }
         return result_frequency;
     }
 
