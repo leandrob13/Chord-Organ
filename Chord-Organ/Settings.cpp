@@ -32,7 +32,6 @@ void Settings::copy_defaults() {
 			notes[i][a] = default_notes[i][a];
 		}
 	}
-	num_chords = 16;
 }
 
 void Settings::read() {
@@ -96,6 +95,9 @@ void Settings::read() {
                     }
                 } else if(setting_value.startsWith("!STACK")) {
                 	stacked = true;
+                } else if(setting_value.startsWith("!CUSTOM")) {
+                	custom_chords = true;
+                    num_chords = 16;
                 } else {
                     no_valid_value = true;
                 }

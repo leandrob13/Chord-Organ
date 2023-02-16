@@ -5,6 +5,7 @@
 #include "teensy.h"
 #include "organ.h"
 #include "synth.h"
+#include "j6_chords.h"
 
 // #define DEBUG_STARTUP
 // #define DEBUG_MODE
@@ -56,7 +57,7 @@ void setup(){
 void loop(){
 
     checkInterface();
-    int16_t* chord = settings.notes[organ.chord];
+    int16_t* chord = (settings.custom_chords) ? settings.notes[organ.chord] : genre_chords[organ.genre][organ.chord];
 
     // CHECK BUTTON STATUS 
     control.reset_hold = control.reset_hold * control.resetButton;
@@ -124,29 +125,66 @@ void checkInterface(){
     int rootPot = analogRead(ROOT_POT_PIN); 
     int rootCV = analogRead(ROOT_CV_PIN); 
 
-    // Copy pots and CVs to new value 
-    int chord_total = chordPot + chordCV; 
-    chord_total = constrain(chord_total, 0, ADC_MAX_VAL - 1);
-
     rootPot = constrain(rootPot, 0, ADC_MAX_VAL - 1);
     rootCV = constrain(rootCV, 0, ADC_MAX_VAL - 1);
 
-    control.root_changed = false;
     // Apply hysteresis and filtering to prevent jittery quantization 
     // Thanks to Matthias Puech for this code 
 
-    if ((chord_total > control.chordRawOld + CHANGE_TOLERANCE) || (chord_total < control.chordRawOld - CHANGE_TOLERANCE)){
-        control.chordRawOld = chord_total;    
+    if (settings.custom_chords) {
+        // Copy pots and CVs to new value 
+        int chord_total = chordPot + chordCV; 
+        chord_total = constrain(chord_total, 0, ADC_MAX_VAL - 1);
+
+        if ((chord_total > control.chordRawOld + CHANGE_TOLERANCE) || (chord_total < control.chordRawOld - CHANGE_TOLERANCE)){
+            control.chordRawOld = chord_total;    
+        }
+        else {
+            control.chordRawOld += (chord_total - control.chordRawOld) >>5; 
+            chord_total = control.chordRawOld;  
+        }
+
+        organ.chord = map(chord_total, 0, ADC_MAX_VAL, 0, organ.chord_count);
+
+    } else {
+        chordPot = constrain(chordPot, 0, ADC_MAX_VAL - 1);
+        chordCV = constrain(chordCV, 0, ADC_MAX_VAL - 1);
+
+        if ((chordCV > control.chordCVOld + CHANGE_TOLERANCE) || (chordCV < control.chordCVOld - CHANGE_TOLERANCE)){
+            control.chordCVOld = chordCV;
+        }
+        else {
+            control.chordCVOld += (chordCV - control.chordCVOld) >>5;
+            chordCV = control.chordCVOld;
+        }
+        
+        if ((chordPot > control.chordPotOld + CHANGE_TOLERANCE) || (chordPot < control.chordPotOld - CHANGE_TOLERANCE)){
+            control.chordPotOld = chordPot;
+        }
+        else {
+            control.chordPotOld += (chordPot - control.chordPotOld) >>5;
+            chordPot = control.chordPotOld;
+        }
+
+        // Map ADC reading to Note Numbers
+        int chordCVQuant = ceil(chordCV * midi_note_factor);
+        int scale = chordCVQuant / 12;
+        organ.chord_transpose = scale * 12; //map(chordCVQuant, 0, 40, 0, 3) * 12;
+        organ.chord = chordCVQuant % 12;
+        
+        // Use Pot as genre selector
+        organ.genre = map(chordPot, 0, ADC_MAX_VAL, 0, genre_count - 1);
     }
-    else {
-        control.chordRawOld += (chord_total - control.chordRawOld) >>5; 
-        chord_total = control.chordRawOld;  
+
+    if (organ.chord != organ.chord_old || organ.genre != organ.genre_old){
+        control.changed = true; 
+        organ.chord_old = organ.chord; 
+        organ.genre_old = organ.genre;   
     }
 
     // Do Pot and CV separately
     if ((rootPot > control.rootPotOld + CHANGE_TOLERANCE) || (rootPot < control.rootPotOld - CHANGE_TOLERANCE)){
         control.rootPotOld = rootPot;
-        control.root_changed = true;
     }
     else {
         control.rootPotOld += (rootPot - control.rootPotOld) >>5;
@@ -155,24 +193,17 @@ void checkInterface(){
     
     if ((rootCV > control.rootCVOld + CHANGE_TOLERANCE) || (rootCV < control.rootCVOld - CHANGE_TOLERANCE)){
         control.rootCVOld = rootCV;
-        control.root_changed = true;
     }
     else {
         control.rootCVOld += (rootCV - control.rootCVOld) >>5;
         rootCV = control.rootCVOld;
     }
 
-    organ.chord = map(chord_total, 0, ADC_MAX_VAL, 0, organ.chord_count);
-    if (organ.chord != organ.chord_old){
-        control.changed = true; 
-        organ.chord_old = organ.chord;    
-    }
-
     // Map ADC reading to Note Numbers
     int rootCVQuant = ceil(rootCV * midi_note_factor) + LOW_NOTE;
     
     // Use Pot as transpose for CV
-    int rootPotQuant = map(rootPot,0,ADC_MAX_VAL,0,48);
+    int rootPotQuant = map(rootPot, 0, ADC_MAX_VAL, 0, 48);
     organ.root = rootCVQuant + rootPotQuant;
     if (organ.root != organ.root_old){
        control.changed = true; 

@@ -10,10 +10,11 @@ typedef struct Control
     int chordRawOld;
     int rootPotOld;
     int rootCVOld;
+    int chordPotOld;
+    int chordCVOld;
 
     // Flag for either chord or root note change
     boolean changed = true;
-    boolean root_changed = false;
 
     Bounce reset_cv = Bounce( RESET_CV, 40 ); 
     boolean resetButton = false;
@@ -32,11 +33,14 @@ typedef struct Control
 
 typedef struct Organ {
     static const int oscillator_count = 8;
-    int chord_count = 16;
+    int genre = 0;
+    int genre_old;
+    int chord_count = 12;
     int chord;
     int chord_old;
     int root;
     int root_old;
+    int chord_transpose = 0;
 
     // Target frequency of each oscillator
     float freq[oscillator_count] = {55,110, 220, 440, 880,1760,3520,7040};
@@ -100,7 +104,7 @@ typedef struct Organ {
         if(stacked) {
             for(int i=0;i < half_oscillator_count;i++) {
                 if (chord[i] != 255) {
-                    note_number = root + chord[i];
+                    note_number = root + chord[i] + chord_transpose;
                     if(note_number < 0) note_number = 0;
                     if(note_number > 127) note_number = 127;
                     float new_freq = midi_to_freq_lut[note_number];
@@ -115,7 +119,7 @@ typedef struct Organ {
         } else {
             for(int i = 0; i< 8; i++){
                 if (chord[i] != 255) {
-                    note_number = root + chord[i];
+                    note_number = root + chord[i] + chord_transpose;
                     if(note_number < 0) note_number = 0;
                     if(note_number > 127) note_number = 127;
                     

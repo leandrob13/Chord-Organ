@@ -13,11 +13,12 @@ class Settings {
 	boolean to_boolean(String setting_value);
 
 	boolean stacked = false;
+	boolean custom_chords = false;
 	boolean no_valid_value = false;
     boolean glide = false;
     int glide_time = 50;
     uint8_t note_range = 38;
-    uint8_t num_chords = 0;
+    uint8_t num_chords = 12;
 	// Initialise Array with 255s, to identify unfilled elements when reading from SD card 
 	int16_t notes[16][8] = {
 	    { 255,255,255,255,255,255,255,255 },    
