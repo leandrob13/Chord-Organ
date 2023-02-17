@@ -200,7 +200,7 @@ void checkInterface(){
     }
 
     // Map ADC reading to Note Numbers
-    int rootCVQuant = ceil(rootCV * midi_note_factor) + LOW_NOTE;
+    int rootCVQuant = ceil(rootCV * midi_note_factor) + organ.low_note;
     
     // Use Pot as transpose for CV
     int rootPotQuant = map(rootPot, 0, ADC_MAX_VAL, 0, 48);

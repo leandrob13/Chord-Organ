@@ -41,6 +41,7 @@ typedef struct Organ {
     int root;
     int root_old;
     int chord_transpose = 0;
+    int low_note = 0;
 
     // Target frequency of each oscillator
     float freq[oscillator_count] = {55,110, 220, 440, 880,1760,3520,7040};
@@ -77,6 +78,7 @@ typedef struct Organ {
         one_over_glide_time = 1.0 / (float) glide_time;
         note_range = settings.note_range;
         stacked = settings.stacked;
+        low_note = settings.low_note;
     }
 
     float* get_current_frequency() {

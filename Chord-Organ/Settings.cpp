@@ -98,6 +98,7 @@ void Settings::read() {
                 } else if(setting_value.startsWith("!CUSTOM")) {
                 	custom_chords = true;
                     num_chords = 16;
+                    low_note = 36;
                 } else {
                     no_valid_value = true;
                 }
