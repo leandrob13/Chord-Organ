@@ -35,11 +35,9 @@ void Settings::copy_defaults() {
 }
 
 void Settings::read() {
-    num_chords = 0;
-
     char character;
     int note = 0;
-    String setting_value;
+    String setting_value = "";
 
     int NONE = 0;
     int CHORD = 1;
@@ -52,10 +50,9 @@ void Settings::read() {
         
         character = settings_file.read();
 
-        if (character == '[') {
-            if(num_chords < 16) {
-                state = CHORD;    
-            }
+        if (character == '[' && num_chords < 16) {
+            state = CHORD; 
+            character = settings_file.read();
         } else if(character == '!') {
             state = SETTING;
         }
@@ -72,7 +69,7 @@ void Settings::read() {
                 note = 0;
                 state = NONE;
             } else {
-                setting_value += character;     
+                setting_value += character;
             }
 
         } else if(state == SETTING) {
@@ -97,7 +94,7 @@ void Settings::read() {
                 	stacked = true;
                 } else if(setting_value.startsWith("!CUSTOM")) {
                 	custom_chords = true;
-                    num_chords = 16;
+                    num_chords = 0;
                     low_note = 36;
                 } else {
                     no_valid_value = true;
@@ -176,8 +173,6 @@ void Settings::write() {
     settings_file.println("15 [-12,-12,0,0,0] Sub Octave");
     settings_file.println("16 [-12,0,0,12,24] 2 up 1 down octaves");
 
-    //
     // close the file:
     settings_file.close();
-    //Serial.println("Writing done.");	
 }

@@ -20,7 +20,6 @@ Control control;
 Synth synth;
 
 void setup(){
-    pinMode(BANK_BUTTON,INPUT);
     pinMode(RESET_BUTTON, INPUT);
     pinMode(RESET_CV, INPUT); 
     pinMode(RESET_LED, OUTPUT);
@@ -75,7 +74,6 @@ void loop(){
     }
 
     if (control.changed)  {
-        // Serial.println("Trig Out");
         control.pulse_out_timer = 0;
         control.flashing = true;
         pinMode(RESET_CV, OUTPUT);
@@ -92,9 +90,7 @@ void loop(){
         AudioNoInterrupts();
         float* current_frequency = organ.get_current_frequency();
         synth.set_frequencies(current_frequency);
-        //updateFrequencies();
         synth.update_mixers();
-        //updateAmps(organ.AMP, organ.WAVEFORM_AMP);
         AudioInterrupts();
 
         control.changed = false;
@@ -130,9 +126,7 @@ void checkInterface(){
 
     // Apply hysteresis and filtering to prevent jittery quantization 
     // Thanks to Matthias Puech for this code 
-
     if (settings.custom_chords) {
-        // Copy pots and CVs to new value 
         int chord_total = chordPot + chordCV; 
         chord_total = constrain(chord_total, 0, ADC_MAX_VAL - 1);
 
@@ -144,7 +138,7 @@ void checkInterface(){
             chord_total = control.chordRawOld;  
         }
 
-        organ.chord = map(chord_total, 0, ADC_MAX_VAL, 0, organ.chord_count);
+        organ.chord = map(chord_total, 0, ADC_MAX_VAL, 0, organ.chord_count - 1);
 
     } else {
         chordPot = constrain(chordPot, 0, ADC_MAX_VAL - 1);
