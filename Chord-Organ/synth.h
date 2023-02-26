@@ -48,6 +48,7 @@ typedef struct synth {
 
     // Custom wavetables
     int16_t const* wave_tables[12] {
+        wave0,
         wave1,
         wave2,
         wave3,
