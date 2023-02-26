@@ -36,7 +36,7 @@ typedef struct Organ {
     int genre = 0;
     int genre_old;
     int chord_count = 12;
-    int chord;
+    int chord = 0;
     int chord_old;
     int root;
     int root_old;
