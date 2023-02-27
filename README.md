@@ -8,6 +8,8 @@ The new firmware version of the popular module Music Thing Chord Organ includes 
 - [Features](#features)
 - [Configuration](#configuration)
 - [Default Genres](#default-genres)
+- [Caveats](#caveats)
+- [Future Roadmap](#future-roadmap)
 
 ## Installation
 
@@ -77,3 +79,17 @@ There are 29 default genres included in the firmware. Each genre includes 12 cho
 - Trad Maj1
 - Trad Min1
 - Trance1
+
+## Caveats
+
+- The 1V/Oct tracking in the CV inputs is restricted to 3 octaves given that the internal ADC reference voltage is 3.3V. There is no scaling circuit that can allow a broader range.
+- I tested for the highest note range (72) from the original firmware and it gets a bit jittery after noon in the `Root` knob. I would recommend to leave it at the default value.
+- I also tested the `STACK` option, it seems to not have much effect on the sound of the chords.
+
+## Future Roadmap
+
+I am considering adding these features in the future:
+- Instead of custom chords, allow to add custom genres based on the J6 chord table.
+- Reduce possible voices to 4 instead of 8.
+- Add a chord arpeggiator.
+- Add a lowpass gate triggered by the `Trig` CV input.
