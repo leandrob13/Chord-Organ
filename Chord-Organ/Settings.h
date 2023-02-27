@@ -18,7 +18,7 @@ class Settings {
     boolean glide = false;
 	int low_note = 0;
     int glide_time = 50;
-    uint8_t note_range = 38;
+    uint8_t note_range = 36;
     uint8_t num_chords = 12;
 	// Initialise Array with 255s, to identify unfilled elements when reading from SD card 
 	int16_t notes[16][8] = {

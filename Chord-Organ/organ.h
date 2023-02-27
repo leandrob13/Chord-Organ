@@ -69,7 +69,7 @@ typedef struct Organ {
     boolean stacked = false;
     float stack_freq_scale = 1.001;
 
-    int note_range = 38;
+    int note_range = 36;
 
     void init(Settings settings) {
         chord_count = settings.num_chords;
