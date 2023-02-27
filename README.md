@@ -33,9 +33,9 @@ The new firmware includes new features and keeps others from the original v0.6. 
 
 ## Configuration
 
-As in the original firmware, it is possible to include additional functionalities based on the configuration file in the SD card. 
+As in the original firmware, it is possible to include additional functionalities based on the configuration file in the SD card. Include the configuration file in the SD card and name it `CHORDORG.txt`. The example file is included in this repo.
 
-### Stacked Voices
+### Config Params
 
 |Param           |min |Max |Description                                                     |
 |----------------|----|----|----------------------------------------------------------------|
