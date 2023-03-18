@@ -28,7 +28,7 @@ void Settings::init(boolean has_SD) {
 
 void Settings::copy_defaults() {
 	for(int i = 0; i < 16; i++) {
-		for(int a = 0; a < 8; a++) {
+		for(int a = 0; a < 4; a++) {
 			notes[i][a] = default_notes[i][a];
 		}
 	}
