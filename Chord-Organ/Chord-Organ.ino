@@ -197,7 +197,7 @@ void checkInterface(){
     int rootCVQuant = ceil(rootCV * midi_note_factor) + organ.low_note;
     
     // Use Pot as transpose for CV
-    int rootPotQuant = map(rootPot, 0, ADC_MAX_VAL, 0, 48);
+    int rootPotQuant = map(rootPot, 0, ADC_MAX_VAL, 0, organ.note_range);
     organ.root = rootCVQuant + rootPotQuant;
     if (organ.root != organ.root_old){
        control.changed = true; 
