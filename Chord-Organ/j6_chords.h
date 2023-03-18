@@ -1,4 +1,4 @@
-const int genre_count = 29;
+const int genre_count = 20;
 
 int16_t genre_chords[genre_count][12][4] = {
     {   //Oct Stack1
