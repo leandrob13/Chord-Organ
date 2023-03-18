@@ -48,33 +48,24 @@ As in the original firmware, it is possible to include additional functionalitie
 
 ## Default Genres
 
-There are 29 default genres included in the firmware. Each genre includes 12 chords that can be properly tracked by octave with the `Chord` CV input and transposed with the `Root` knob and CV input. The genres correspond in order with the ones included in the [Roland J6 chord table](https://static.roland.com/manuals/J-6_manual_v102/eng/28645807.html). The included genres ordered as follow:
+There are 20 default genres included in the firmware. Each genre includes 12 chords that can be properly tracked by octave with the `Chord` CV input and transposed with the `Root` knob and CV input. The genres correspond in order with the ones included in the [Roland J6 chord table](https://static.roland.com/manuals/J-6_manual_v102/eng/28645807.html). The included genres ordered as follow:
 
 - Oct Stack1
 - 5th Stack1
 - Cinematic1
 - Cinematic2
-- Cinematic3
 - EDM1
 - EDM2
 - EDM3
 - EDM4
-- EDM5
-- EDM6
 - House1
 - House2
 - House3
 - House4
-- House5
-- House6
 - Synthwave1
 - Synthwave2
 - Synthwave3
 - Synthwave4
-- Synthwave5
-- Synthwave6
-- Synthwave7
-- Synthwave8
 - Techno1
 - Trad Maj1
 - Trad Min1

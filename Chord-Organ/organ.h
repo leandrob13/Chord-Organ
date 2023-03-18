@@ -32,7 +32,7 @@ typedef struct Control
 } Control;
 
 typedef struct Organ {
-    static const int oscillator_count = 8;
+    static const int oscillator_count = 4;
     int genre = 0;
     int genre_old;
     int chord_count = 12;
@@ -44,14 +44,14 @@ typedef struct Organ {
     int low_note = 0;
 
     // Target frequency of each oscillator
-    float freq[oscillator_count] = {55,110, 220, 440, 880,1760,3520,7040};
+    float freq[oscillator_count] = { 55, 110, 220, 440 };
 
     // Total distance between last note and new.
     // NOT distance per time step.
-    float delta_frequency[oscillator_count] = {0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};
+    float delta_frequency[oscillator_count] = { 0.0, 0.0, 0.0, 0.0 };
 
     // Keep track of current frequency of each oscillator
-    float current_frequency[oscillator_count] = {55,110, 220, 440, 880,1760,3520,7040};
+    float current_frequency[oscillator_count] = { 55, 110, 220, 440 };
 
     // GLIDE
     // Main flag for glide on / off
@@ -66,7 +66,6 @@ typedef struct Organ {
     boolean gliding = false;
 
     // Stack mode replicates first 4 voices into last 4 with tuning offset
-    boolean stacked = false;
     float stack_freq_scale = 1.001;
 
     int note_range = 36;
@@ -77,7 +76,6 @@ typedef struct Organ {
         glide_time = settings.glide_time;
         one_over_glide_time = 1.0 / (float) glide_time;
         note_range = settings.note_range;
-        stacked = settings.stacked;
         low_note = settings.low_note;
     }
 
@@ -90,7 +88,7 @@ typedef struct Organ {
                 gliding = false;
             }
 
-            for(int i=0;i<8;i++) {
+            for(int i = 0; i < oscillator_count; i++) {
                 current_frequency[i] = freq[i] - (delta_frequency[i] * dt);
             }
             result_frequency = current_frequency;
@@ -101,37 +99,18 @@ typedef struct Organ {
     int update_frequencies(int16_t* chord) {
         int note_number;
         int voice_count = 0;
-        int half_oscillator_count = oscillator_count >> 1;
 
-        if(stacked) {
-            for(int i=0;i < half_oscillator_count;i++) {
-                if (chord[i] != 255) {
-                    note_number = root + chord[i] + chord_transpose;
-                    if(note_number < 0) note_number = 0;
-                    if(note_number > 127) note_number = 127;
-                    float new_freq = midi_to_freq_lut[note_number];
-
-                    freq[i] = new_freq;
-                    freq[i+half_oscillator_count] = new_freq * stack_freq_scale;
-                    delta_frequency[i] = new_freq - current_frequency[i];
-                    delta_frequency[i+half_oscillator_count] = (new_freq * stack_freq_scale) - current_frequency[i];
-                    voice_count += 2;
-                }            
+        for(int i = 0; i< oscillator_count; i++){
+            if (chord[i] != 255) {
+                note_number = root + chord[i] + chord_transpose;
+                if(note_number < 0) note_number = 0;
+                if(note_number > 127) note_number = 127;
+                
+                float newFreq = midi_to_freq_lut[note_number];
+                delta_frequency[i] = newFreq - current_frequency[i];
+                freq[i] = newFreq;
+                voice_count++;
             }
-        } else {
-            for(int i = 0; i< 8; i++){
-                if (chord[i] != 255) {
-                    note_number = root + chord[i] + chord_transpose;
-                    if(note_number < 0) note_number = 0;
-                    if(note_number > 127) note_number = 127;
-                    
-                    float newFreq = midi_to_freq_lut[note_number];
-                    delta_frequency[i] = newFreq - current_frequency[i];
-                    freq[i] = newFreq;
-                    voice_count++;
-                }
-            }
-
         }
         return voice_count;
     }

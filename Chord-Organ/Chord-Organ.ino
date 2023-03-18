@@ -85,7 +85,7 @@ void loop(){
             organ.gliding = true;
         }
         int voice_count = organ.update_frequencies(chord);
-        synth.update_amps(voice_count, organ.stacked, chord);
+        synth.update_amps(voice_count, chord);
 
         AudioNoInterrupts();
         float* current_frequency = organ.get_current_frequency();
