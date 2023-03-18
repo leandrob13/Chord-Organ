@@ -85,7 +85,7 @@ void loop(){
             organ.gliding = true;
         }
         int voice_count = organ.update_frequencies(chord);
-        synth.update_amps(voice_count, organ.stacked, chord);
+        synth.update_amps(voice_count, chord);
 
         AudioNoInterrupts();
         float* current_frequency = organ.get_current_frequency();
@@ -197,7 +197,7 @@ void checkInterface(){
     int rootCVQuant = ceil(rootCV * midi_note_factor) + organ.low_note;
     
     // Use Pot as transpose for CV
-    int rootPotQuant = map(rootPot, 0, ADC_MAX_VAL, 0, 48);
+    int rootPotQuant = map(rootPot, 0, ADC_MAX_VAL, 0, organ.note_range);
     organ.root = rootCVQuant + rootPotQuant;
     if (organ.root != organ.root_old){
        control.changed = true; 

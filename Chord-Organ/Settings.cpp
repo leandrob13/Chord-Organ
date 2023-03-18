@@ -28,7 +28,7 @@ void Settings::init(boolean has_SD) {
 
 void Settings::copy_defaults() {
 	for(int i = 0; i < 16; i++) {
-		for(int a = 0; a < 8; a++) {
+		for(int a = 0; a < 4; a++) {
 			notes[i][a] = default_notes[i][a];
 		}
 	}
@@ -90,8 +90,6 @@ void Settings::read() {
                         if(note_range < 12) note_range = 12;
                         if(note_range > 72) note_range = 72;
                     }
-                } else if(setting_value.startsWith("!STACK")) {
-                	stacked = true;
                 } else if(setting_value.startsWith("!CUSTOM")) {
                 	custom_chords = true;
                     num_chords = 0;
@@ -156,22 +154,22 @@ void Settings::write() {
     settings_file.println("the same number of notes.");
     settings_file.println("");
 
-    settings_file.println("1  [0,4,7,12,0] Major");
-    settings_file.println("2  [0,3,7,12,0] Minor");
-    settings_file.println("3  [0,4,7,11,0] Major 7th");
-    settings_file.println("4  [0,3,7,10,0] Minor 7th");
-    settings_file.println("5  [0,4,7,11,14] Major 9th");
-    settings_file.println("6  [0,3,7,10,14] Minor 9th");
-    settings_file.println("7  [0,5,7,12,0] Suspended 4th");
-    settings_file.println("8  [0,7,12,0,7] Power 5th");
-    settings_file.println("9  [0,5,12,0,5] Power 4th");
-    settings_file.println("10 [0,4,7,8,0] Major 6th");
-    settings_file.println("11 [0,3,7,8,0] Minor 6th");
-    settings_file.println("12 [0,3,6,0,3] Diminished");
-    settings_file.println("13 [0,4,8,0,4] Augmented");
-    settings_file.println("14 [0,0,0,0,0] Root");
-    settings_file.println("15 [-12,-12,0,0,0] Sub Octave");
-    settings_file.println("16 [-12,0,0,12,24] 2 up 1 down octaves");
+    settings_file.println("1  [0,4,7,12] Major");
+    settings_file.println("2  [0,3,7,12] Minor");
+    settings_file.println("3  [0,4,7,11] Major 7th");
+    settings_file.println("4  [0,3,7,10] Minor 7th");
+    settings_file.println("5  [0,4,7,11] Major 9th");
+    settings_file.println("6  [0,3,7,10] Minor 9th");
+    settings_file.println("7  [0,5,7,12] Suspended 4th");
+    settings_file.println("8  [0,7,12,0] Power 5th");
+    settings_file.println("9  [0,5,12,0] Power 4th");
+    settings_file.println("10 [0,4,7,8] Major 6th");
+    settings_file.println("11 [0,3,7,8] Minor 6th");
+    settings_file.println("12 [0,3,6,0] Diminished");
+    settings_file.println("13 [0,4,8,0] Augmented");
+    settings_file.println("14 [0,0,0,0] Root");
+    settings_file.println("15 [-12,-12,0,0] Sub Octave");
+    settings_file.println("16 [-12,0,0,12] 2 up 1 down octaves");
 
     // close the file:
     settings_file.close();
